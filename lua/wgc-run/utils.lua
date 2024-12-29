@@ -40,4 +40,11 @@ M.validate_funcs = function(vals, ...)
   end)
 end
 
+M.delete_autocmds = function(group)
+  local cmds = vim.api.nvim_get_autocmds({ group = group })
+  vim.iter(cmds):each(function(cmd)
+    vim.api.nvim_del_autocmd(cmd.id)
+  end)
+end
+
 return M

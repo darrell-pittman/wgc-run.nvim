@@ -1,8 +1,6 @@
 local utils = require('wgc-run.utils')
 local run = require('wgc-run.run')
 
-local group = vim.api.nvim_create_augroup('WgcRunGroup', { clear = true })
-
 local M = {}
 
 local function validate(runner)
@@ -30,23 +28,7 @@ local function validate(runner)
   return is_ok or false
 end
 
-local function process_project_cmd(runner)
-  local found = vim.fs.find(
-    utils.get_config().project_run_file,
-    { path = vim.uv.cwd() }
-  )
 
-  if found and #found == 1 then
-    local m, err = loadfile(found[1])
-    if m then
-      local project_run = m()
-      runner.run_cmd = project_run.run_cmd
-      runner.run_cwd = project_run.run_cwd
-    else
-      vim.notify(string.format('Error processing "%s" file: %s', err), vim.log.levels.ERROR)
-    end
-  end
-end
 
 local function process_cmd(runner)
   local run_cmd = runner and runner.run_cmd
@@ -69,18 +51,19 @@ local function process_cmd(runner)
   return is_ok or false
 end
 
-M.create_command = function(runner)
-  local ok = validate(runner)
+M.create_command = function(runner, run_group)
+  local runner_copy = vim.tbl_deep_extend('force', {}, runner)
+  local ok = validate(runner_copy)
   if ok then
-    process_project_cmd(runner)
-    ok = ok and process_cmd(runner)
+    ok = ok and process_cmd(runner_copy)
   end
+  print('Ok: ', ok)
   if ok then
     vim.api.nvim_create_autocmd('BufEnter', {
-      group = group,
-      pattern = runner.pattern,
+      group = run_group,
+      pattern = runner_copy.pattern,
       callback = function(info)
-        run.run(info, runner)
+        run.run(info, runner_copy)
       end,
     })
   end
