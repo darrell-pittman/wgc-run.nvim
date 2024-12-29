@@ -47,4 +47,23 @@ M.delete_autocmds = function(group)
   end)
 end
 
+M.string = {
+  center = function(str, width)
+    local padding = math.floor((width - string.len(str)) / 2)
+    return M.string.pad(str, padding)
+  end,
+  pad = function(str, n)
+    return string.rep(' ', n) .. str
+  end,
+  is_empty = function(s)
+    return (not s) or (string.len(s) == 0)
+  end,
+  is_not_empty = function(s)
+    return not M.string.is_empty(s)
+  end,
+  empty_val = function(s, v)
+    return M.string.is_empty(s) and v or s
+  end,
+}
+
 return M

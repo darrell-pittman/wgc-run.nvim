@@ -28,8 +28,10 @@ local function create_commands()
   utils.delete_autocmds(run_group)
   local runners = get_project_runners()
   runners = runners or utils.get_config().runners
-  for i = 1, #runners do
-    command.create_command(runners[i], run_group)
+  if runners and #runners > 0 then
+    for i = 1, #runners do
+      command.create_command(runners[i], run_group)
+    end
   end
 end
 
@@ -37,6 +39,7 @@ M.setup = function(opts)
   utils.apply_config(opts)
   create_commands()
 
+  utils.delete_autocmds(cd_group)
   vim.api.nvim_create_autocmd('DirChanged', {
     group = cd_group,
     pattern = '*',

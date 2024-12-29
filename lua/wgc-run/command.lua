@@ -3,7 +3,7 @@ local run = require('wgc-run.run')
 
 local M = {}
 
-local function validate(runner)
+local function validate_static(runner)
   local is_ok = utils.validate_strings(runner.pattern, function(p)
     return p and string.len(p) > 0
   end)
@@ -28,42 +28,67 @@ local function validate(runner)
   return is_ok or false
 end
 
-
-
 local function process_cmd(runner)
+  local static_cmd = true
   local run_cmd = runner and runner.run_cmd
   local is_ok = run_cmd and type(run_cmd) == 'table'
 
   if is_ok then
-    local all_strings = vim.iter(run_cmd):all(function(cmd)
-      return type(cmd) == 'string'
-    end)
-    if all_strings then
-      runner.static_cmd = true
-    else
-      is_ok = vim.iter(run_cmd):all(function(cmd)
-        local typ = type(cmd)
-        return typ == 'string' or typ == 'function'
-      end)
+    for i = 1, #run_cmd do
+      local typ = type(run_cmd[i])
+      if typ == 'function' then
+        static_cmd = false
+      else
+        if typ ~= 'string' then
+          is_ok = false
+          break
+        end
+      end
     end
   end
 
-  return is_ok or false
+  return is_ok, static_cmd
+end
+
+local function validate_runtime(info, runner)
+  local is_ok = true
+  local tests = runner.validate and runner.validate.runtime
+
+  if tests then
+    is_ok = utils.validate_funcs(tests.tests, info)
+  end
+
+  return is_ok
+end
+
+local function create_run_command(info, runner, static_cmd)
+  local ok = validate_runtime(info, runner)
+  local buffer_keymaps = utils.get_config().buffer_keymaps
+
+  if ok then
+    if buffer_keymaps and type(buffer_keymaps) == 'function' then
+      buffer_keymaps(info)
+    end
+
+    vim.api.nvim_buf_create_user_command(info.buf, 'WgcRun', function()
+        run.run(info, runner, static_cmd)
+      end,
+      {})
+  end
 end
 
 M.create_command = function(runner, run_group)
-  local runner_copy = vim.tbl_deep_extend('force', {}, runner)
-  local ok = validate(runner_copy)
+  local static_cmd
+  local ok = validate_static(runner)
   if ok then
-    ok = ok and process_cmd(runner_copy)
+    ok, static_cmd = process_cmd(runner)
   end
-  print('Ok: ', ok)
   if ok then
-    vim.api.nvim_create_autocmd('BufEnter', {
+    vim.api.nvim_create_autocmd('BufRead', {
       group = run_group,
-      pattern = runner_copy.pattern,
+      pattern = runner.pattern,
       callback = function(info)
-        run.run(info, runner_copy)
+        create_run_command(info, runner, static_cmd)
       end,
     })
   end
