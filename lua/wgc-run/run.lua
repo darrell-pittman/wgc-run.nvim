@@ -106,6 +106,7 @@ local function default_runner(name, cmd, opts)
   local footer = tbl_pad({
     '',
     '--' .. name .. ' Finished!--',
+    '',
   })
 
 
