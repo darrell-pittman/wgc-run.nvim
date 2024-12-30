@@ -2,37 +2,29 @@ local utils = require('wgc-run.utils')
 
 local M = {}
 
-vim.cmd('highlight link WgcRunHeader Title')
-vim.cmd('highlight link WgcRunSubHeader Function')
-
 local current_job_id = nil
 
 local constants = {
   WINDOW_TITLE = 'WgcRun',
-  WINDOW_WIDTH = 65,
   HEADER_SYM = '━',
   MARGIN = 1,
 }
 
+local disp = nil
+
 local function pad(l)
   return utils.string.pad(l, constants.MARGIN)
-end
-
-local function center(l)
-  return utils.string.center(l, constants.WINDOW_WIDTH)
 end
 
 local function tbl_pad(t)
   return vim.tbl_map(pad, t)
 end
 
-
-local disp = nil
-
 local function kill_job(f)
   if current_job_id and disp then
     vim.fn.jobstop(current_job_id)
-    vim.api.nvim_buf_set_lines(disp.buf, -1, -1, false, { pad(string.format("Killed Job [ id = %d ]", current_job_id)) })
+    vim.api.nvim_buf_set_lines(disp.buf, -1, -1, false,
+      { pad(string.format("Killed Job [ id = %d ]", current_job_id)) })
     current_job_id = nil
   end
   if f then f() end
@@ -54,9 +46,40 @@ local function open_window(callback)
     disp = nil
   end
   disp = {}
-  vim.cmd(('%svnew'):format(constants.WINDOW_WIDTH))
-  disp.buf = vim.api.nvim_get_current_buf()
-  disp.win = vim.api.nvim_get_current_win()
+
+  local rows = vim.api.nvim_get_option_value('lines', { scope = 'global' })
+  local cols = vim.api.nvim_get_option_value('columns', { scope = 'global' })
+  local width = math.floor(0.8 * cols)
+  local height = math.floor(0.8 * rows)
+  local row = math.floor((rows - height) / 2) - 1
+  local col = math.floor((cols - width) / 2)
+
+  disp.width = width
+  disp.buf = vim.api.nvim_create_buf(false, true)
+
+  disp.win = vim.api.nvim_open_win(disp.buf, true, {
+    relative = 'editor',
+    row = row,
+    col = col,
+    width = width,
+    height = height - 1,
+    style = 'minimal',
+    border = 'rounded',
+    title = {
+      {
+        ' ::: [WgcRun] ::: ',
+        'FloatBorder',
+      },
+    },
+    title_pos = 'center',
+    footer = {
+      {
+        ' Press <C-c> to kill job, q to close window (and kill job if running) ',
+        'FloatBorder',
+      },
+    },
+    footer_pos = 'center',
+  })
 
   vim.cmd('setlocal buftype=nofile bufhidden=wipe nobuflisted' ..
     ' nolist noswapfile nowrap nospell nonumber norelativenumber' ..
@@ -77,7 +100,6 @@ local function open_window(callback)
   end)()
 
   map('n', 'q', close_window)
-  map('n', '<esc>', close_window)
   map('n', '<C-c>', kill_job)
 
   local noops = { 'a', 'c', 'd', 'i', 'x', 'r', 'o', 'p', }
@@ -87,14 +109,6 @@ local function open_window(callback)
   end
 
   vim.api.nvim_buf_set_name(disp.buf, '[WgcRun]')
-  vim.api.nvim_buf_set_lines(disp.buf, 0, -1, false, {
-    center(constants.WINDOW_TITLE),
-    center('::: press [q] or <esc> to close (<C-c> to kill job) :::'),
-    pad(string.rep(constants.HEADER_SYM, constants.WINDOW_WIDTH - 2 * constants.MARGIN)),
-    '',
-  })
-  vim.api.nvim_buf_add_highlight(disp.buf, -1, 'WgcRunHeader', 0, constants.MARGIN, -1)
-  vim.api.nvim_buf_add_highlight(disp.buf, -1, 'WgcRunSubHeader', 1, constants.MARGIN, -1)
   callback()
 end
 
